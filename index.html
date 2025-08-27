@@ -1,0 +1,648 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Study To-Do & Timer</title>
+  <!-- quick inline SVG favicon (no extra files) -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20fill='%2360a5fa'/%3E%3Ctext%20x='50'%20y='68'%20font-size='48'%20font-family='Arial'%20fill='%2304263b'%20text-anchor='middle'%20font-weight='700'%3EST%3C/text%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20100%20100'%3E%3Crect%20width='100'%20height='100'%20fill='%2360a5fa'/%3E%3Ctext%20x='50'%20y='68'%20font-size='48'%20font-family='Arial'%20fill='%2304263b'%20text-anchor='middle'%20font-weight='700'%3EST%3C/text%3E%3C/svg%3E">
+<meta name="theme-color" content="#60a5fa">
+
+  <!-- Chart.js CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root{
+      --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#60a5fa; --good:#34d399; --danger:#fb7185;
+      --glass: rgba(255,255,255,0.03);
+      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+    }
+    *{box-sizing:border-box}
+    body{margin:0; background:linear-gradient(180deg,#071127 0%, #071726 100%); color:#e6eef8;}
+    .container{max-width:1100px;margin:28px auto;padding:18px}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+    h1{font-size:20px;margin:0}
+    .tabs{display:flex;gap:8px;margin-top:12px}
+    .tab{padding:8px 14px;background:var(--glass);border-radius:10px;cursor:pointer;color:var(--muted)}
+    .tab.active{background:linear-gradient(90deg,var(--card), rgba(96,165,250,0.08));color:var(--accent);box-shadow:0 6px 20px rgba(8,20,36,0.6)}
+
+    .content{display:grid;grid-template-columns:1fr 420px;gap:18px;margin-top:18px}
+    @media(max-width:980px){.content{grid-template-columns:1fr} .right-col{order:2}}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01));padding:14px;border-radius:12px}
+    .subject-list{display:flex;flex-direction:column;gap:10px}
+    .subject{display:flex;align-items:center;gap:12px;padding:12px;background:rgba(255,255,255,0.02);border-radius:10px}
+    .subject h3{margin:0;font-size:16px}
+    .subject .meta{margin-left:auto;text-align:right}
+    .small{font-size:12px;color:var(--muted)}
+
+    label{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+    input[type=number]{width:90px;padding:8px;border-radius:8px;border:1px solid rgba(255,255,255,0.04);background:transparent;color:inherit}
+    select, button{padding:8px;border-radius:8px;border:0;background:var(--card);color:inherit}
+    .controls{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+
+    .progress-wrap{width:210px;height:12px;background:rgba(255,255,255,0.03);border-radius:10px;overflow:hidden}
+    .progress-bar{height:100%;background:linear-gradient(90deg,var(--accent), #7dd3fc);width:0%}
+
+    .timer{display:flex;flex-direction:column;gap:12px}
+    .time-display{font-size:28px;font-weight:600}
+    .stats{display:flex;gap:10px;flex-wrap:wrap}
+    .stat{flex:1;min-width:160px;padding:8px;border-radius:8px;background:rgba(255,255,255,0.015);text-align:center}
+
+    footer{margin-top:18px;font-size:12px;color:var(--muted);}
+
+    /* nice table */
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px;text-align:left;border-bottom:1px dashed rgba(255,255,255,0.03)}
+
+    .small-note{font-size:12px;color:var(--muted);margin-top:8px}
+  /* ✨ Smooth hover animations everywhere */
+* {
+  transition: all 0.25s ease-in-out;
+}
+
+/* Hover on subject cards */
+.subject:hover {
+  transform: translateY(-4px) scale(1.02);
+  background: rgba(255,255,255,0.05);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.4);
+}
+
+/* Hover on tabs */
+.tab:hover {
+  color: var(--accent);
+  background: rgba(96,165,250,0.08);
+  transform: translateY(-2px);
+}
+
+/* Hover on buttons */
+button:hover {
+  background: linear-gradient(135deg, var(--accent), #7dd3fc);
+  color: #04263b;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+  transform: translateY(-2px) scale(1.03);
+}
+
+/* Hover on table rows */
+table tr:hover {
+  background: rgba(255,255,255,0.03);
+  transform: scale(1.01);
+}
+
+/* Hover on cards */
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+}
+
+/* ========= New sections ========= */
+.section{padding:64px 0; position:relative;}
+.container.narrow{max-width:900px; margin:0 auto;}
+.section h2{margin:0 0 16px; font-size:22px}
+
+/* give sections a glassy card */
+.section .container{
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.04);
+  border-radius: 14px;
+  padding: 16px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.25);
+}
+
+/* countdown layout */
+.countdown{display:flex; gap:16px; justify-content:center; flex-wrap:wrap}
+.countdown div{
+  background: rgba(255,255,255,0.03);
+  padding: 12px 16px;
+  border-radius: 12px;
+  min-width: 100px;
+  text-align: center;
+}
+.countdown span{display:block; font-size:32px; font-weight:700}
+.countdown small{display:block; color:var(--muted)}
+
+/* weekly targets grid */
+.weekly-list{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+@media(max-width:700px){.weekly-list{grid-template-columns:1fr}}
+.weekly-item{
+  display:flex; align-items:center; gap:8px;
+  background: rgba(255,255,255,0.02);
+  padding:8px; border-radius:10px;
+}
+.weekly-item input[type="text"]{
+  flex:1; min-width:0;
+  background:transparent; border:1px solid rgba(255,255,255,0.06);
+  border-radius:8px; padding:8px; color:inherit;
+}
+.weekly-item input[type="checkbox"]{transform:scale(1.2)}
+
+.tips-list{list-style:none; padding:0; margin:0; display:grid; gap:8px}
+.tips-list li{padding:10px 12px; background:rgba(255,255,255,0.02); border-radius:10px}
+</style>
+</head>
+<body>
+
+  <div class="container">
+    <header>
+      <div style="width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,var(--accent),#7dd3fc);display:flex;align-items:center;justify-content:center;color:#04263b;font-weight:700">ST</div>
+      <div>
+        <h1>Study To-Do & Timer</h1>
+        <div class="small">8 subjects, chapters tracker, timer with daily/weekly/monthly aggregation & graph — ready for GitHub Pages. 📚</div>
+      </div>
+    </header>
+
+    <div class="tabs">
+      <div class="tab active" data-tab="todo">To-Do List</div>
+      <div class="tab" data-tab="timer">Timer & Stats</div>
+    </div>
+
+    <div class="content">
+      <div class="left-col">
+        <div class="card" id="todoPane">
+          <h2 style="margin-top:0">Your Subjects</h2>
+          <div class="subject-list" id="subjectList">
+            <!-- subjects injected by JS -->
+          </div>
+          <div style="margin-top:12px;display:flex;gap:8px;align-items:center">
+            <button id="resetSubjects">Reset Subjects</button>
+            <div class="small-note">Reset will clear saved counts and timer sessions.</div>
+          </div>
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3 style="margin:0 0 8px 0">All Subjects Progress</h3>
+          <table>
+            <thead><tr><th>Subject</th><th>Chapters</th><th>Completed</th><th>%</th></tr></thead>
+            <tbody id="summaryTable"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="right-col">
+        <div class="card timer" id="timerPane">
+          <h3 style="margin:0">Timer & Recording</h3>
+          <div style="margin-top:8px">
+            <label for="subjectSelect">Select Subject</label>
+            <select id="subjectSelect"></select>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px;margin-top:12px">
+            <div class="time-display" id="timeDisplay">00:00:00</div>
+            <div style="margin-left:auto;display:flex;gap:8px">
+              <button id="startBtn">Start</button>
+              <button id="pauseBtn" disabled>Pause</button>
+              <button id="saveBtn" disabled>Stop & Save</button>
+            </div>
+          </div>
+
+          <div class="controls">
+            <button id="resetTimer">Reset Timer</button>
+            <label style="margin-left:auto">View: <select id="periodSelect"><option value="week">This Week</option><option value="month">This Month</option></select></label>
+          </div>
+
+          <div class="stats" style="margin-top:10px">
+            <div class="stat"><div class="small">Today</div><div id="todayTime">0h 0m</div></div>
+            <div class="stat"><div class="small">Weekly</div><div id="weeklyTime">0h 0m</div></div>
+            <div class="stat"><div class="small">Monthly</div><div id="monthlyTime">0h 0m</div></div>
+            <div class="stat"><div class="small">Total Sessions</div><div id="sessionsCount">0</div></div>
+          </div>
+
+        </div>
+
+        <div class="card" style="margin-top:12px">
+          <h3 style="margin:0">Study Time Graph</h3>
+          <div style="height:260px;margin-top:10px"><canvas id="timeChart"></canvas></div>
+          <div class="small-note">Bar graph shows time (hours) per subject for the selected period.</div>
+        </div>
+
+      </div>
+    </div>
+
+    <footer>
+      Tip: Click a subject's "Save" after editing chapters to persist. Also: don't forget snacks. 🍪
+    </footer>
+  </div>
+  <!-- ========== NEW: Tall sections ========== -->
+
+<section class="section section-graphs" id="chaptersSection">
+  <div class="container narrow">
+    <h2>📊 Chapters Completed</h2>
+    <div style="height:300px">
+      <canvas id="chaptersChart"></canvas>
+    </div>
+    <div class="small-note">Shows completed vs remaining chapters for each subject.</div>
+  </div>
+</section>
+
+<section class="section section-countdown" id="countdownSection">
+  <div class="container narrow">
+    <h2>⏳ Exam Countdown</h2>
+    <div id="countdown" class="countdown">
+      <div><span id="cdDays">0</span><small>Days</small></div>
+      <div><span id="cdHours">0</span><small>Hours</small></div>
+      <div><span id="cdMinutes">0</span><small>Minutes</small></div>
+      <div><span id="cdSeconds">0</span><small>Seconds</small></div>
+    </div>
+    <div class="small-note">Target: 1 Jan 2026</div>
+    <label for="examDateInput" style="margin-top:12px; display:block; color:var(--muted)">Set Exam Date:</label>
+<input type="date" id="examDateInput">
+
+  </div>
+</section>
+
+<section class="section section-weekly" id="weeklySection">
+  <div class="container narrow">
+    <h2>🗓 Weekly Targets</h2>
+    <div id="weeklyList" class="weekly-list"></div>
+    <div class="small-note">10 targets for the current week. Autosaves as you type/check.</div>
+  </div>
+</section>
+
+<section class="section section-tips" id="tipsSection">
+  <div class="container narrow">
+    <h2>💡 Tips (Remaining Chapters)</h2>
+    <ul id="tipsList" class="tips-list"></ul>
+  </div>
+</section>
+
+
+  <script>
+    // --- Data model & defaults ---
+    const DEFAULT_SUBJECTS = [
+      'Accounting','Income Tax','GST','Law','Costing','Financial Management','Strategic Management','Auditing'
+    ];
+
+    const LS_SUBJECTS = 'study_subjects_v1';
+    const LS_SESSIONS = 'study_sessions_v1';
+
+    // load or init
+    function loadSubjects(){
+      const raw = localStorage.getItem(LS_SUBJECTS);
+      if(raw) return JSON.parse(raw);
+      const init = DEFAULT_SUBJECTS.map(name=>({name, chapters:0, completed:0}));
+      localStorage.setItem(LS_SUBJECTS, JSON.stringify(init));
+      return init;
+    }
+    function saveSubjects(arr){ localStorage.setItem(LS_SUBJECTS, JSON.stringify(arr)); }
+
+    function loadSessions(){
+      const raw = localStorage.getItem(LS_SESSIONS);
+      if(raw) return JSON.parse(raw);
+      return [];
+    }
+    function saveSessions(arr){ localStorage.setItem(LS_SESSIONS, JSON.stringify(arr)); }
+
+    let subjects = loadSubjects();
+    let sessions = loadSessions();
+
+    // --- UI helpers ---
+    const subjectList = document.getElementById('subjectList');
+    const subjectSelect = document.getElementById('subjectSelect');
+    const summaryTable = document.getElementById('summaryTable');
+
+    function renderSubjects(){
+      subjectList.innerHTML=''; subjectSelect.innerHTML='';
+      subjects.forEach((s,idx)=>{
+        const div = document.createElement('div'); div.className='subject';
+        div.innerHTML = `
+          <div style="width:42px;height:42px;border-radius:8px;background:rgba(255,255,255,0.03);display:flex;align-items:center;justify-content:center;font-weight:700">${s.name.split(' ').map(p=>p[0]).slice(0,2).join('')}</div>
+          <div style="min-width:160px">
+            <h3>${s.name}</h3>
+            <div class="small">Chapters: <input type="number" min="0" value="${s.chapters}" data-idx="${idx}" class="chap-input" style="width:84px"> &nbsp; Completed: <input type="number" min="0" value="${s.completed}" data-idx="${idx}" class="comp-input" style="width:84px"> <button data-idx="${idx}" class="saveSubject">Save</button></div>
+          </div>
+          <div class="meta">
+            <div class="small">% Completed</div>
+            <div style="display:flex;align-items:center;gap:8px;margin-top:6px">
+              <div class="progress-wrap"><div class="progress-bar" id="pb${idx}" style="width:${computePercent(s)}%"></div></div>
+              <div style="min-width:40px;text-align:right;font-weight:600">${computePercent(s)}%</div>
+            </div>
+          </div>
+        `;
+        subjectList.appendChild(div);
+        // make card clickable but don't trigger when clicking inputs/buttons inside it
+div.style.cursor = 'pointer';
+div.addEventListener('click', (e) => {
+  // if user clicked an input or one of the buttons inside the card, do nothing
+  if (e.target.closest('.saveSubject') || e.target.tagName === 'INPUT' || e.target.tagName === 'BUTTON') return;
+  window.open(`subject.html?idx=${idx}`, '_blank');
+});
+
+
+        const opt = document.createElement('option'); opt.value = idx; opt.textContent = s.name; subjectSelect.appendChild(opt);
+      });
+      renderSummaryTable();
+      attachSubjectHandlers();
+      updateTips();
+renderChaptersChart();
+
+    }
+
+    function computePercent(s){
+      if(!s.chapters || s.chapters==0) return 0;
+      const p = Math.round((s.completed / s.chapters) * 100);
+      return Math.min(100, Math.max(0,p));
+    }
+
+    function renderSummaryTable(){
+      summaryTable.innerHTML='';
+      subjects.forEach((s,idx)=>{
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td>${s.name}</td><td>${s.chapters}</td><td>${s.completed}</td><td>${computePercent(s)}%</td>`;
+        summaryTable.appendChild(tr);
+      });
+      updateTips();
+renderChaptersChart();
+
+    }
+
+    function attachSubjectHandlers(){
+      document.querySelectorAll('.saveSubject').forEach(btn=>{
+        btn.onclick = ()=>{
+          const idx = +btn.dataset.idx;
+          const chap = Math.max(0, parseInt(document.querySelector(`.chap-input[data-idx='${idx}']`).value) || 0);
+          const comp = Math.max(0, parseInt(document.querySelector(`.comp-input[data-idx='${idx}']`).value) || 0);
+          subjects[idx].chapters=chap; subjects[idx].completed=Math.min(comp,chap);
+          saveSubjects(subjects);
+          renderSubjects();
+        }
+      })
+    }
+
+    document.getElementById('resetSubjects').onclick = ()=>{
+      if(!confirm('Reset all chapters and sessions?')) return;
+      subjects = DEFAULT_SUBJECTS.map(name=>({name,chapters:0,completed:0})); saveSubjects(subjects);
+      sessions = []; saveSessions(sessions);
+      renderSubjects(); updateStatsAndChart();
+    }
+
+    // --- Timer logic ---
+    let timerInterval=null; let elapsed = 0; let running=false;
+    const timeDisplay = document.getElementById('timeDisplay');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const saveBtn = document.getElementById('saveBtn');
+    const resetTimerBtn = document.getElementById('resetTimer');
+    const periodSelect = document.getElementById('periodSelect');
+
+    function formatHMS(sec){
+      const h = Math.floor(sec/3600); const m = Math.floor((sec%3600)/60); const s = sec%60;
+      return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
+    }
+
+    function tick(){ elapsed++; timeDisplay.textContent = formatHMS(elapsed); }
+
+    startBtn.onclick = ()=>{
+      if(running) return;
+      running=true; startBtn.disabled=true; pauseBtn.disabled=false; saveBtn.disabled=false;
+      timerInterval = setInterval(tick,1000);
+    }
+    pauseBtn.onclick = ()=>{
+      if(!running) return;
+      running=false; startBtn.disabled=false; pauseBtn.disabled=true;
+      clearInterval(timerInterval);
+    }
+    resetTimerBtn.onclick = ()=>{
+      if(confirm('Reset current timer?')){ clearInterval(timerInterval); running=false; elapsed=0; timeDisplay.textContent='00:00:00'; startBtn.disabled=false; pauseBtn.disabled=true; saveBtn.disabled=true; }
+    }
+
+    saveBtn.onclick = ()=>{
+      if(elapsed<=0){ alert('No time recorded. Start timer first.'); return; }
+      const subjIdx = +subjectSelect.value;
+      const session = {subject: subjIdx, seconds: elapsed, ts: new Date().toISOString()};
+      sessions.push(session); saveSessions(sessions);
+      // reset current timer
+      clearInterval(timerInterval); running=false; elapsed=0; timeDisplay.textContent='00:00:00'; startBtn.disabled=false; pauseBtn.disabled=true; saveBtn.disabled=true;
+      updateStatsAndChart();
+      document.getElementById('sessionsCount').textContent = sessions.length;
+    }
+
+    // --- Aggregation and charting ---
+    const todayEl = document.getElementById('todayTime');
+    const weeklyEl = document.getElementById('weeklyTime');
+    const monthlyEl = document.getElementById('monthlyTime');
+    const sessionsCountEl = document.getElementById('sessionsCount');
+
+    function secondsToHM(sec){ const h=Math.floor(sec/3600); const m=Math.floor((sec%3600)/60); return `${h}h ${m}m`; }
+
+    function startOfDay(dt){ const d=new Date(dt); d.setHours(0,0,0,0); return d; }
+    function startOfWeek(dt){ const d=new Date(dt); const day = (d.getDay()+6)%7; d.setHours(0,0,0,0); d.setDate(d.getDate()-day); return d; }
+    function startOfMonth(dt){ const d=new Date(dt); d.setDate(1); d.setHours(0,0,0,0); return d; }
+
+    function aggregate(period='week'){
+      const now = new Date();
+      let start;
+      if(period==='day') start = startOfDay(now);
+      else if(period==='week') start = startOfWeek(now);
+      else start = startOfMonth(now);
+
+      const totals = Array(subjects.length).fill(0);
+      let tot=0;
+      sessions.forEach(s=>{
+        const ts = new Date(s.ts);
+        if(ts>=start && ts<=now){ totals[Number(s.subject)]+=s.seconds; tot+=s.seconds; }
+      });
+      return {totals, tot};
+    }
+
+    let chart=null;
+    function createChart(labels, data){
+      const ctx = document.getElementById('timeChart').getContext('2d');
+      if(chart) chart.destroy();
+      chart = new Chart(ctx, {
+        type:'bar', data:{labels, datasets:[{label:'Hours studied', data: data.map(s=>Number((s/3600).toFixed(2))) }]},
+        options:{scales:{y:{beginAtZero:true}}, plugins:{legend:{display:false}}}
+      });
+    }
+
+    function updateStatsAndChart(){
+      const period = periodSelect.value;
+      const {totals} = aggregate(period);
+      const today = aggregate('day');
+      const weekly = aggregate('week');
+      const monthly = aggregate('month');
+
+      todayEl.textContent = secondsToHM(today.tot);
+      weeklyEl.textContent = secondsToHM(weekly.tot);
+      monthlyEl.textContent = secondsToHM(monthly.tot);
+      sessionsCountEl.textContent = sessions.length;
+
+      createChart(subjects.map(s=>s.name), totals);
+    }
+
+    periodSelect.onchange = updateStatsAndChart;
+
+    // ===== NEW: Chapters Completed chart (per subject) =====
+let chaptersChart = null;
+function renderChaptersChart(){
+  const el = document.getElementById('chaptersChart');
+  if(!el) return;
+  const labels = subjects.map(s=>s.name);
+  const completed = subjects.map(s=>Number(s.completed||0));
+  const remaining = subjects.map(s=>Math.max(0, Number(s.chapters||0) - Number(s.completed||0)));
+
+  if(chaptersChart) chaptersChart.destroy();
+  const ctx = el.getContext('2d');
+  chaptersChart = new Chart(ctx, {
+    type:'bar',
+    data:{
+      labels,
+      datasets:[
+        { label:'Completed', data: completed },
+        { label:'Remaining', data: remaining }
+      ]
+    },
+    options:{
+      responsive:true,
+      maintainAspectRatio:false,
+      scales:{ y:{ beginAtZero:true } },
+      plugins:{ legend:{ labels:{ boxWidth:12 } } }
+    }
+  });
+}
+
+// ===== NEW: Exam Countdown (configurable & persistent) =====
+
+// Load saved date or default
+let examDate = localStorage.getItem('examDate') 
+               ? new Date(localStorage.getItem('examDate')) 
+               : new Date('2026-01-01T00:00:00');
+
+const dateInput = document.getElementById('examDateInput');
+dateInput.value = examDate.toISOString().slice(0,10);
+
+dateInput.addEventListener('change', (e)=>{
+  examDate = new Date(e.target.value + 'T00:00:00');
+  localStorage.setItem('examDate', examDate.toISOString());
+});
+
+function updateCountdown(){
+  const now = new Date();
+  const diff = Math.max(0, examDate - now);
+  const d = Math.floor(diff / (1000*60*60*24));
+  const h = Math.floor((diff / (1000*60*60)) % 24);
+  const m = Math.floor((diff / (1000*60)) % 60);
+  const s = Math.floor((diff / 1000) % 60);
+  document.getElementById('cdDays').textContent = d;
+  document.getElementById('cdHours').textContent = h;
+  document.getElementById('cdMinutes').textContent = m;
+  document.getElementById('cdSeconds').textContent = s;
+}
+
+// initialize countdown
+updateCountdown();
+setInterval(updateCountdown, 1000);
+
+// ===== NEW: Weekly Targets (10 items, autosave, resets per week) =====
+const LS_WEEKLY = 'study_weekly_targets_v1';
+function startOfWeekISO(dt){
+  // reuse your logic: Monday-start week
+  const d = new Date(dt); const day = (d.getDay()+6)%7; d.setHours(0,0,0,0); d.setDate(d.getDate()-day); return d;
+}
+function weekKey(){
+  const d = startOfWeekISO(new Date());
+  return d.toISOString().slice(0,10); // YYYY-MM-DD of Monday
+}
+function loadWeekly(){
+  const raw = localStorage.getItem(LS_WEEKLY);
+  const store = raw ? JSON.parse(raw) : {};
+  const key = weekKey();
+  if(!store[key]) store[key] = Array.from({length:10}, ()=>({text:'', done:false}));
+  localStorage.setItem(LS_WEEKLY, JSON.stringify(store));
+  return {store, key};
+}
+let weekly = loadWeekly();
+function saveWeekly(){ localStorage.setItem(LS_WEEKLY, JSON.stringify(weekly.store)); }
+function renderWeekly(){
+  const wrap = document.getElementById('weeklyList');
+  if(!wrap) return;
+  wrap.innerHTML = '';
+  weekly.store[weekly.key].forEach((item, idx)=>{
+    const row = document.createElement('div');
+    row.className = 'weekly-item';
+    row.innerHTML = `
+      <input type="checkbox" ${item.done?'checked':''} data-idx="${idx}">
+      <input type="text" placeholder="Target ${idx+1}" value="${item.text}" data-idx="${idx}">
+    `;
+    wrap.appendChild(row);
+  });
+  // listeners
+  wrap.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    cb.addEventListener('change', e=>{
+      const i = +e.target.dataset.idx;
+      weekly.store[weekly.key][i].done = e.target.checked; saveWeekly();
+    });
+  });
+  wrap.querySelectorAll('input[type="text"]').forEach(inp=>{
+    inp.addEventListener('input', e=>{
+      const i = +e.target.dataset.idx;
+      weekly.store[weekly.key][i].text = e.target.value; saveWeekly();
+    });
+  });
+}
+
+// ===== NEW: Tips (remaining chapters per subject) =====
+function updateTips(){
+  const ul = document.getElementById('tipsList');
+  if(!ul) return;
+  ul.innerHTML = '';
+  subjects.forEach(s=>{
+    const total = Number(s.chapters||0);
+    const done = Number(s.completed||0);
+    const rem = Math.max(0, total - done);
+    const li = document.createElement('li');
+    li.textContent = `${s.name}: ${rem} chapter${rem===1?'':'s'} remaining.`;
+    ul.appendChild(li);
+  });
+}
+
+// ===== Ensure these update on first load =====
+function initNewSections(){
+  renderChaptersChart();
+  renderWeekly();
+  updateTips();
+  updateCountdown();
+  setInterval(updateCountdown, 1000);
+}
+// --- Init ---
+    renderSubjects(); updateStatsAndChart();
+    document.getElementById('sessionsCount').textContent = sessions.length;
+    initNewSections();
+
+
+    // make tabs work
+    document.querySelectorAll('.tab').forEach(t=>t.onclick = ()=>{
+      document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); t.classList.add('active');
+      const sel = t.dataset.tab;
+      document.getElementById('todoPane').style.display = sel==='todo' ? 'block' : 'none';
+      document.getElementById('timerPane').style.display = sel==='timer' ? 'block' : 'none';
+    });
+
+    // expose backup/export simple functions for user
+    window.exportData = ()=>{
+      const blob = new Blob([JSON.stringify({subjects,sessions},null,2)],{type:'application/json'});
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href=url; a.download='study_backup.json'; a.click(); URL.revokeObjectURL(url);
+    }
+
+    // initial button states
+    pauseBtn.disabled=true; saveBtn.disabled=true;
+
+    // data migration guard (if old invalid saved state)
+    if(!Array.isArray(subjects) || subjects.length!==DEFAULT_SUBJECTS.length){ subjects = DEFAULT_SUBJECTS.map(name=>({name,chapters:0,completed:0})); saveSubjects(subjects); }
+
+  </script>
+  <!-- load toggleable add-ons -->
+  <script src="addons.js"></script> 
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
