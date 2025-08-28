@@ -11,6 +11,8 @@
 
   <!-- Chart.js CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.13.0/gsap.min.js"></script>
+
   <style>
     :root{
       --bg:#0f1724; --card:#0b1220; --muted:#94a3b8; --accent:#60a5fa; --good:#34d399; --danger:#fb7185;
@@ -375,46 +377,84 @@ renderChaptersChart();
       renderSubjects(); updateStatsAndChart();
     }
 
-    // --- Timer logic ---
-    let timerInterval=null; let elapsed = 0; let running=false;
-    const timeDisplay = document.getElementById('timeDisplay');
-    const startBtn = document.getElementById('startBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const resetTimerBtn = document.getElementById('resetTimer');
-    const periodSelect = document.getElementById('periodSelect');
+// --- Timer logic (background-safe) ---
+let timerInterval = null;
+let startTime = null;
+let elapsedBefore = 0; // seconds accumulated before current run
+let running = false;
 
-    function formatHMS(sec){
-      const h = Math.floor(sec/3600); const m = Math.floor((sec%3600)/60); const s = sec%60;
-      return String(h).padStart(2,'0')+':'+String(m).padStart(2,'0')+':'+String(s).padStart(2,'0');
-    }
+const timeDisplay = document.getElementById('timeDisplay');
+const startBtn = document.getElementById('startBtn');
+const pauseBtn = document.getElementById('pauseBtn');
+const saveBtn = document.getElementById('saveBtn');
+const resetTimerBtn = document.getElementById('resetTimer');
+const periodSelect = document.getElementById('periodSelect');
 
-    function tick(){ elapsed++; timeDisplay.textContent = formatHMS(elapsed); }
+function formatHMS(sec){
+  const h = Math.floor(sec/3600);
+  const m = Math.floor((sec%3600)/60);
+  const s = sec%60;
+  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+}
 
-    startBtn.onclick = ()=>{
-      if(running) return;
-      running=true; startBtn.disabled=true; pauseBtn.disabled=false; saveBtn.disabled=false;
-      timerInterval = setInterval(tick,1000);
-    }
-    pauseBtn.onclick = ()=>{
-      if(!running) return;
-      running=false; startBtn.disabled=false; pauseBtn.disabled=true;
-      clearInterval(timerInterval);
-    }
-    resetTimerBtn.onclick = ()=>{
-      if(confirm('Reset current timer?')){ clearInterval(timerInterval); running=false; elapsed=0; timeDisplay.textContent='00:00:00'; startBtn.disabled=false; pauseBtn.disabled=true; saveBtn.disabled=true; }
-    }
+function updateDisplay(){
+  let totalElapsed = elapsedBefore;
+  if(running){
+    totalElapsed += Math.floor((Date.now() - startTime)/1000);
+  }
+  timeDisplay.textContent = formatHMS(totalElapsed);
+}
 
-    saveBtn.onclick = ()=>{
-      if(elapsed<=0){ alert('No time recorded. Start timer first.'); return; }
-      const subjIdx = +subjectSelect.value;
-      const session = {subject: subjIdx, seconds: elapsed, ts: new Date().toISOString()};
-      sessions.push(session); saveSessions(sessions);
-      // reset current timer
-      clearInterval(timerInterval); running=false; elapsed=0; timeDisplay.textContent='00:00:00'; startBtn.disabled=false; pauseBtn.disabled=true; saveBtn.disabled=true;
-      updateStatsAndChart();
-      document.getElementById('sessionsCount').textContent = sessions.length;
-    }
+startBtn.onclick = ()=>{
+  if(running) return;
+  running = true;
+  startBtn.disabled = true;
+  pauseBtn.disabled = false;
+  saveBtn.disabled = false;
+  startTime = Date.now();
+  timerInterval = setInterval(updateDisplay, 500); // update twice per second
+}
+
+pauseBtn.onclick = ()=>{
+  if(!running) return;
+  running = false;
+  startBtn.disabled = false;
+  pauseBtn.disabled = true;
+  elapsedBefore += Math.floor((Date.now() - startTime)/1000);
+  clearInterval(timerInterval);
+}
+
+resetTimerBtn.onclick = ()=>{
+  if(confirm('Reset current timer?')){
+    running = false;
+    clearInterval(timerInterval);
+    elapsedBefore = 0;
+    startTime = null;
+    timeDisplay.textContent='00:00:00';
+    startBtn.disabled=false;
+    pauseBtn.disabled=true;
+    saveBtn.disabled=true;
+  }
+}
+
+saveBtn.onclick = ()=>{
+  let totalElapsed = elapsedBefore;
+  if(running){
+    totalElapsed += Math.floor((Date.now() - startTime)/1000);
+  }
+  if(totalElapsed <= 0){ alert('No time recorded. Start timer first.'); return; }
+
+  const subjIdx = +subjectSelect.value;
+  const session = {subject: subjIdx, seconds: totalElapsed, ts: new Date().toISOString()};
+  sessions.push(session); saveSessions(sessions);
+
+  // reset timer
+  running=false; clearInterval(timerInterval); elapsedBefore=0; startTime=null; timeDisplay.textContent='00:00:00';
+  startBtn.disabled=false; pauseBtn.disabled=true; saveBtn.disabled=true;
+  updateStatsAndChart();
+  document.getElementById('sessionsCount').textContent = sessions.length;
+}
+
 
     // --- Aggregation and charting ---
     const todayEl = document.getElementById('todayTime');
@@ -607,6 +647,32 @@ function initNewSections(){
     renderSubjects(); updateStatsAndChart();
     document.getElementById('sessionsCount').textContent = sessions.length;
     initNewSections();
+function addCardHoverEffect() {
+  document.querySelectorAll('.subject').forEach(card => {
+    card.addEventListener('mouseenter', () => {
+      gsap.to(card, {
+        duration: 0.4,
+        rotationX: 8,
+        rotationY: -8,
+        scale: 1.05,
+        transformOrigin: "center",
+        ease: "power3.out"
+      });
+    });
+    card.addEventListener('mouseleave', () => {
+      gsap.to(card, {
+        duration: 0.4,
+        rotationX: 0,
+        rotationY: 0,
+        scale: 1,
+        ease: "power3.out"
+      });
+    });
+  });
+}
+
+// Call the function after subjects are rendered
+addCardHoverEffect();
 
 
     // make tabs work
@@ -635,7 +701,6 @@ function initNewSections(){
   <script src="addons.js"></script> 
 </body>
 </html>
-
 
 
 
