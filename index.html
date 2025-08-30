@@ -4,6 +4,8 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Study Tracker</title>
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         :root {
@@ -261,6 +263,7 @@
             font-weight: 700;
             text-align: center;
             margin: 10px 0;
+            font-family: monospace;
         }
 
         .pomodoro-mode {
@@ -276,6 +279,13 @@
 
         .pomodoro-mode button.active {
             background: var(--good);
+        }
+        
+        .pomo-session-count {
+            text-align: center;
+            font-size: 14px;
+            color: var(--muted);
+            margin-top: 8px;
         }
     </style>
 </head>
@@ -364,6 +374,7 @@
                     <button id="pomoPause" disabled>Pause</button>
                     <button id="pomoReset">Reset</button>
                 </div>
+                <div class="pomo-session-count">Sessions completed: <span id="pomoSessions">0</span></div>
                 <div class="small-note">Focus for 25 minutes, then take a 5-minute break</div>
             </div>
         </div>
@@ -378,6 +389,7 @@
 
     const LS_SUBJECTS = 'study_subjects_v1';
     const LS_SESSIONS = 'study_sessions_v1';
+    const LS_POMODORO = 'study_pomodoro_v1';
 
     // Theme management
     const themeToggle = document.getElementById('themeToggle');
@@ -425,8 +437,16 @@
     }
     function saveSessions(arr){ localStorage.setItem(LS_SESSIONS, JSON.stringify(arr)); }
 
+    function loadPomodoro(){
+        const raw = localStorage.getItem(LS_POMODORO);
+        if(raw) return JSON.parse(raw);
+        return { sessions: 0 };
+    }
+    function savePomodoro(obj){ localStorage.setItem(LS_POMODORO, JSON.stringify(obj)); }
+
     let subjects = loadSubjects();
     let sessions = loadSessions();
+    let pomodoro = loadPomodoro();
 
     // --- UI helpers ---
     const subjectList = document.getElementById('subjectList');
@@ -640,6 +660,7 @@
     const pomoWorkBtn = document.getElementById('pomoWork');
     const pomoShortBtn = document.getElementById('pomoShort');
     const pomoLongBtn = document.getElementById('pomoLong');
+    const pomoSessionsEl = document.getElementById('pomoSessions');
 
     function formatPomoTime(seconds) {
         const m = Math.floor(seconds / 60);
@@ -649,6 +670,7 @@
 
     function updatePomoDisplay() {
         pomoDisplay.textContent = formatPomoTime(pomoTimeLeft);
+        pomoSessionsEl.textContent = pomodoro.sessions;
     }
 
     function setPomoMode(mode) {
@@ -688,7 +710,18 @@
                 pomoStartBtn.disabled = false;
                 pomoPauseBtn.disabled = true;
                 
-                alert(`Pomodoro ${pomoMode} session complete!`);
+                if (pomoMode === 'work') {
+                    pomodoro.sessions++;
+                    savePomodoro(pomodoro);
+                    updatePomoDisplay();
+                    
+                    // After work session, switch to short break
+                    setPomoMode('short');
+                    startPomo();
+                } else {
+                    // After break session, switch back to work
+                    setPomoMode('work');
+                }
             }
         }, 1000);
     }
