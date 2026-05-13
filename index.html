@@ -533,7 +533,7 @@ async function saveSession(session) {
     document.getElementById('resetSubjects').onclick = ()=>{
         if(!confirm('Reset all chapters and sessions?')) return;
         subjects = DEFAULT_SUBJECTS.map(name=>({name,chapters:0,completed:0})); saveSubjects(subjects);
-        sessions = []; saveSessions(sessions);
+        sessions = [];
         renderSubjects(); updateStatsAndChart();
     }
 
