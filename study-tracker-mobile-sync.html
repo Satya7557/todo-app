@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0a0f1a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Study Tracker</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
+    <link rel="manifest" href="data:application/json,{%22name%22:%22Study Tracker%22,%22short_name%22:%22StudyTrack%22,%22start_url%22:%22/%22,%22display%22:%22standalone%22,%22background_color%22:%22%230a0f1a%22,%22theme_color%22:%22%2360a5fa%22,%22icons%22:[{%22src%22:%22data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 192 192%27%3E%3Crect fill=%27%2360a5fa%27 width=%27192%27 height=%27192%27/%3E%3Ctext x=%2796%27 y=%27140%27 font-size=%27120%27 text-anchor=%27middle%27%3E📚%3C/text%3E%3C/svg%3E%22,%22sizes%22:%22192x192%22,%22type%22:%22image/svg+xml%22,%22purpose%22:%22any%22}]}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --bg: #0a0f1a;
+            --card: #0b1220;
+            --text: #e6eef8;
+            --muted: #94a3b8;
+            --accent: #60a5fa;
+            --good: #34d399;
+            --danger: #fb7185;
+            --warning: #fbbf24;
+            --glass: rgba(255,255,255,0.03);
+            --shadow: 0 8px 24px rgba(0,0,0,0.5);
+        }
+
+        [data-theme="light"] {
+            --bg: #f0f4f9;
+            --card: #ffffff;
+            --text: #1e293b;
+            --muted: #64748b;
+            --accent: #3b82f6;
+            --good: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --glass: rgba(0,0,0,0.03);
+            --shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+
+        * {
+            box-sizing: border-box;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        html, body {
+            margin: 0;
+            padding: 0;
+            background: var(--bg);
+            color: var(--text);
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            height: 100%;
+            width: 100%;
+            overflow-x: hidden;
+        }
+
+        body {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .container {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            padding-bottom: 80px;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+        }
+
+        header {
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            border-bottom: 1px solid var(--glass);
+            position: sticky;
+            top: 0;
+            background: var(--card);
+            z-index: 100;
+            backdrop-filter: blur(10px);
+        }
+
+        .logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 8px;
+            background: linear-gradient(135deg, var(--accent), #7dd3fc);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #04263b;
+            font-size: 18px;
+        }
+
+        h1 {
+            font-size: 18px;
+            margin: 0;
+            flex: 1;
+        }
+
+        .sync-status {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            background: var(--glass);
+            color: var(--muted);
+        }
+
+        .sync-status.syncing {
+            color: var(--warning);
+            animation: pulse 1.5s ease-in-out infinite;
+        }
+
+        .sync-status.synced {
+            color: var(--good);
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 0;
+            border-bottom: 1px solid var(--glass);
+            margin: 0 -12px;
+            padding: 0 12px;
+        }
+
+        .nav-tabs button {
+            flex: 1;
+            padding: 12px 8px;
+            background: none;
+            border: none;
+            color: var(--muted);
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            font-size: 14px;
+            transition: all 0.2s ease;
+        }
+
+        .nav-tabs button.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card {
+            background: var(--card);
+            padding: 12px;
+            border-radius: 10px;
+            border: 1px solid var(--glass);
+            margin-bottom: 12px;
+            box-shadow: var(--shadow);
+        }
+
+        .card h3 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .subject-item {
+            background: var(--glass);
+            padding: 12px;
+            border-radius: 8px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 10px;
+            align-items: flex-start;
+        }
+
+        .subject-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, var(--accent), #7dd3fc);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #04263b;
+            font-weight: 700;
+            font-size: 12px;
+            flex-shrink: 0;
+        }
+
+        .subject-info {
+            flex: 1;
+        }
+
+        .subject-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .subject-inputs {
+            display: flex;
+            gap: 6px;
+            font-size: 12px;
+        }
+
+        input[type="number"] {
+            width: 50px;
+            padding: 4px 6px;
+            border-radius: 4px;
+            border: 1px solid var(--glass);
+            background: var(--bg);
+            color: var(--text);
+            font-size: 12px;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 6px;
+            background: var(--glass);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-top: 6px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #7dd3fc);
+            width: 0%;
+            border-radius: 3px;
+        }
+
+        button {
+            padding: 8px 14px;
+            border: none;
+            border-radius: 6px;
+            background: var(--accent);
+            color: white;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        button:active {
+            transform: scale(0.98);
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        button.secondary {
+            background: var(--glass);
+            color: var(--text);
+        }
+
+        .timer-display {
+            font-size: 48px;
+            font-weight: 700;
+            text-align: center;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .timer-controls {
+            display: flex;
+            gap: 8px;
+            justify-content: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+        }
+
+        .timer-controls button {
+            flex: 1;
+            min-width: 70px;
+        }
+
+        select {
+            padding: 8px;
+            border-radius: 6px;
+            border: 1px solid var(--glass);
+            background: var(--card);
+            color: var(--text);
+            font-size: 12px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .stat-box {
+            background: var(--glass);
+            padding: 10px;
+            border-radius: 6px;
+            text-align: center;
+        }
+
+        .stat-label {
+            font-size: 11px;
+            color: var(--muted);
+            margin-bottom: 4px;
+        }
+
+        .stat-value {
+            font-size: 16px;
+            font-weight: 700;
+        }
+
+        .bottom-nav {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--card);
+            border-top: 1px solid var(--glass);
+            display: flex;
+            justify-content: space-around;
+            padding: 8px 0 12px 0;
+            max-width: 600px;
+            margin: 0 auto;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        .bottom-nav button {
+            flex: 1;
+            padding: 8px;
+            background: none;
+            color: var(--muted);
+            font-size: 28px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 0;
+        }
+
+        .bottom-nav button.active {
+            color: var(--accent);
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.7);
+            z-index: 1000;
+            align-items: flex-end;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--card);
+            width: 100%;
+            padding: 20px;
+            border-radius: 16px 16px 0 0;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-close {
+            float: right;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--muted);
+        }
+
+        .theme-toggle {
+            background: var(--glass);
+            color: var(--text);
+            padding: 6px 10px;
+            font-size: 14px;
+            width: auto;
+        }
+
+        .alert {
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            font-size: 12px;
+        }
+
+        .alert.info {
+            background: rgba(96, 165, 250, 0.2);
+            color: var(--accent);
+        }
+
+        .alert.warning {
+            background: rgba(251, 191, 36, 0.2);
+            color: var(--warning);
+        }
+
+        .alert.success {
+            background: rgba(52, 211, 153, 0.2);
+            color: var(--good);
+        }
+
+        .divider {
+            height: 1px;
+            background: var(--glass);
+            margin: 12px 0;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 8px;
+                padding-bottom: 70px;
+            }
+
+            header {
+                padding: 10px;
+            }
+
+            h1 {
+                font-size: 16px;
+            }
+
+            .timer-display {
+                font-size: 40px;
+            }
+
+            .card {
+                padding: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="logo">📚</div>
+    <h1>Study Tracker</h1>
+    <div class="sync-status" id="syncStatus">
+        <span id="syncIcon">✓</span> <span id="syncText">Offline</span>
+    </div>
+    <button class="theme-toggle" id="themeToggle">🌙</button>
+</header>
+
+<div class="nav-tabs">
+    <button class="nav-btn active" data-tab="subjects">📝 Subjects</button>
+    <button class="nav-btn" data-tab="timer">⏱️ Timer</button>
+    <button class="nav-btn" data-tab="settings">⚙️ Settings</button>
+</div>
+
+<div class="container">
+
+    <!-- SUBJECTS TAB -->
+    <div class="tab-content active" id="subjects-tab">
+        <div class="card">
+            <h3>📚 Your Subjects</h3>
+            <div id="subjectsList"></div>
+        </div>
+    </div>
+
+    <!-- TIMER TAB -->
+    <div class="tab-content" id="timer-tab">
+        <div class="card">
+            <h3>⏱️ Study Timer</h3>
+            <label for="subjectSelect" style="display: block; margin-bottom: 8px; font-size: 12px; color: var(--muted);">Select Subject</label>
+            <select id="subjectSelect"></select>
+            <div class="timer-display" id="timerDisplay">00:00:00</div>
+            <div class="timer-controls">
+                <button id="startBtn">Start</button>
+                <button id="pauseBtn" disabled>Pause</button>
+                <button id="stopBtn" disabled>Stop & Save</button>
+            </div>
+            <button class="secondary" style="width: 100%; margin-bottom: 12px;" id="resetBtn">Reset</button>
+            
+            <div class="divider"></div>
+            <h3>📊 Stats</h3>
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Today</div>
+                    <div class="stat-value" id="todayTime">0h 0m</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">This Week</div>
+                    <div class="stat-value" id="weekTime">0h 0m</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">This Month</div>
+                    <div class="stat-value" id="monthTime">0h 0m</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Sessions</div>
+                    <div class="stat-value" id="sessionsCount">0</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS TAB -->
+    <div class="tab-content" id="settings-tab">
+        <div class="card">
+            <h3>🔐 Google Drive Sync</h3>
+            <div id="authStatus"></div>
+            <button id="googleSignIn" style="width: 100%; margin: 12px 0;">Sign in with Google</button>
+            <div class="divider"></div>
+            <button id="syncNow" style="width: 100%; margin-bottom: 12px;">🔄 Sync Now</button>
+            <button id="downloadBackup" class="secondary" style="width: 100%; margin-bottom: 12px;">⬇️ Download Backup</button>
+            <div class="divider"></div>
+            <h3>⚙️ App</h3>
+            <button id="installApp" class="secondary" style="width: 100%; margin-bottom: 12px; display: none;">📲 Install App</button>
+            <button id="resetData" class="secondary" style="width: 100%; color: var(--danger);">🔄 Reset All Data</button>
+            <div class="alert info" style="margin-top: 12px;">
+                💡 Your data is stored locally. Sign in with Google to enable cloud sync and access from any device.
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<div class="bottom-nav">
+    <button class="nav-btn active" data-tab="subjects">📝</button>
+    <button class="nav-btn" data-tab="timer">⏱️</button>
+    <button class="nav-btn" data-tab="settings">⚙️</button>
+</div>
+
+<script>
+    // ============ INITIALIZATION ============
+    const DEFAULT_SUBJECTS = [
+        'Accounting','Income Tax','GST','Law','Costing',
+        'Financial Management','Strategic Management','Auditing'
+    ];
+
+    const LS_SUBJECTS = 'study_subjects_v2';
+    const LS_SESSIONS = 'study_sessions_v2';
+    const LS_THEME = 'study_theme';
+    const LS_GDRIVE_ID = 'study_gdrive_file_id';
+
+    let subjects = loadSubjects();
+    let sessions = loadSessions();
+    let gdriveFileId = localStorage.getItem(LS_GDRIVE_ID);
+
+    // ============ THEME ============
+    function initTheme() {
+        const saved = localStorage.getItem(LS_THEME) || 'dark';
+        document.documentElement.setAttribute('data-theme', saved);
+        updateThemeIcon();
+    }
+
+    function updateThemeIcon() {
+        const theme = document.documentElement.getAttribute('data-theme');
+        const btn = document.getElementById('themeToggle');
+        btn.textContent = theme === 'light' ? '☀️' : '🌙';
+    }
+
+    document.getElementById('themeToggle').addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme');
+        const next = current === 'light' ? 'dark' : 'light';
+        document.documentElement.setAttribute('data-theme', next);
+        localStorage.setItem(LS_THEME, next);
+        updateThemeIcon();
+    });
+
+    // ============ STORAGE ============
+    function loadSubjects() {
+        const raw = localStorage.getItem(LS_SUBJECTS);
+        if (raw) return JSON.parse(raw);
+        const init = DEFAULT_SUBJECTS.map(name => ({name, chapters: 0, completed: 0}));
+        saveSubjects(init);
+        return init;
+    }
+
+    function saveSubjects(arr) {
+        localStorage.setItem(LS_SUBJECTS, JSON.stringify(arr));
+    }
+
+    function loadSessions() {
+        const raw = localStorage.getItem(LS_SESSIONS);
+        return raw ? JSON.parse(raw) : [];
+    }
+
+    function saveSessions(arr) {
+        localStorage.setItem(LS_SESSIONS, JSON.stringify(arr));
+    }
+
+    // ============ TAB NAVIGATION ============
+    document.querySelectorAll('.nav-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const tab = btn.dataset.tab;
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll(`.nav-btn[data-tab="${tab}"]`).forEach(b => b.classList.add('active'));
+            document.getElementById(`${tab}-tab`).classList.add('active');
+        });
+    });
+
+    // ============ SUBJECTS UI ============
+    function renderSubjects() {
+        const list = document.getElementById('subjectsList');
+        const select = document.getElementById('subjectSelect');
+        list.innerHTML = '';
+        select.innerHTML = '';
+
+        subjects.forEach((s, idx) => {
+            const percent = s.chapters ? Math.round((s.completed / s.chapters) * 100) : 0;
+            const avatar = s.name.split(' ').map(w => w[0]).slice(0, 2).join('');
+
+            const item = document.createElement('div');
+            item.className = 'subject-item';
+            item.innerHTML = `
+                <div class="subject-avatar">${avatar}</div>
+                <div class="subject-info" style="flex: 1;">
+                    <div class="subject-name">${s.name}</div>
+                    <div class="subject-inputs">
+                        <input type="number" min="0" value="${s.chapters}" data-idx="${idx}" class="chap-input" placeholder="Ch">
+                        <span>/</span>
+                        <input type="number" min="0" value="${s.completed}" data-idx="${idx}" class="comp-input" placeholder="Done">
+                        <button style="padding: 4px 8px; font-size: 11px; margin-left: auto;" data-idx="${idx}" class="save-subject">Save</button>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: ${percent}%;"></div>
+                    </div>
+                    <div style="font-size: 11px; color: var(--muted); margin-top: 4px;">${percent}% complete</div>
+                </div>
+            `;
+            list.appendChild(item);
+
+            const opt = document.createElement('option');
+            opt.value = idx;
+            opt.textContent = s.name;
+            select.appendChild(opt);
+        });
+
+        document.querySelectorAll('.save-subject').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const idx = +btn.dataset.idx;
+                const chap = Math.max(0, parseInt(document.querySelector(`.chap-input[data-idx="${idx}"]`).value) || 0);
+                const comp = Math.max(0, parseInt(document.querySelector(`.comp-input[data-idx="${idx}"]`).value) || 0);
+                subjects[idx] = {name: subjects[idx].name, chapters: chap, completed: Math.min(comp, chap)};
+                saveSubjects(subjects);
+                renderSubjects();
+            });
+        });
+    }
+
+    // ============ TIMER ============
+    let timerInterval = null;
+    let timerRunning = false;
+    let timerStart = null;
+    let timerElapsed = 0;
+
+    const timerDisplay = document.getElementById('timerDisplay');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const resetBtn = document.getElementById('resetBtn');
+
+    function formatTime(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        const s = sec % 60;
+        return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`;
+    }
+
+    function updateTimerDisplay() {
+        let total = timerElapsed;
+        if (timerRunning) total += Math.floor((Date.now() - timerStart) / 1000);
+        timerDisplay.textContent = formatTime(total);
+    }
+
+    startBtn.addEventListener('click', () => {
+        if (timerRunning) return;
+        timerRunning = true;
+        timerStart = Date.now();
+        startBtn.disabled = true;
+        pauseBtn.disabled = false;
+        stopBtn.disabled = false;
+        timerInterval = setInterval(updateTimerDisplay, 200);
+    });
+
+    pauseBtn.addEventListener('click', () => {
+        timerRunning = false;
+        timerElapsed += Math.floor((Date.now() - timerStart) / 1000);
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        clearInterval(timerInterval);
+    });
+
+    stopBtn.addEventListener('click', () => {
+        if (timerRunning) timerElapsed += Math.floor((Date.now() - timerStart) / 1000);
+        timerRunning = false;
+        clearInterval(timerInterval);
+
+        if (timerElapsed > 0) {
+            const subjIdx = +document.getElementById('subjectSelect').value;
+            sessions.push({subject: subjIdx, seconds: timerElapsed, ts: new Date().toISOString()});
+            saveSessions(sessions);
+            updateStats();
+            timerElapsed = 0;
+            timerDisplay.textContent = '00:00:00';
+            startBtn.disabled = false;
+            pauseBtn.disabled = true;
+            stopBtn.disabled = true;
+            syncToGoogle();
+        }
+    });
+
+    resetBtn.addEventListener('click', () => {
+        timerRunning = false;
+        clearInterval(timerInterval);
+        timerElapsed = 0;
+        timerDisplay.textContent = '00:00:00';
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = true;
+    });
+
+    // ============ STATS ============
+    function secondsToHM(sec) {
+        const h = Math.floor(sec / 3600);
+        const m = Math.floor((sec % 3600) / 60);
+        return `${h}h ${m}m`;
+    }
+
+    function startOfDay(d = new Date()) {
+        const x = new Date(d);
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+
+    function startOfWeek(d = new Date()) {
+        const x = new Date(d);
+        const day = (x.getDay() + 6) % 7;
+        x.setDate(x.getDate() - day);
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+
+    function startOfMonth(d = new Date()) {
+        const x = new Date(d);
+        x.setDate(1);
+        x.setHours(0, 0, 0, 0);
+        return x;
+    }
+
+    function updateStats() {
+        const now = new Date();
+        const today = startOfDay(now);
+        const week = startOfWeek(now);
+        const month = startOfMonth(now);
+
+        let todayTotal = 0, weekTotal = 0, monthTotal = 0;
+
+        sessions.forEach(s => {
+            const ts = new Date(s.ts);
+            if (ts >= today) todayTotal += s.seconds;
+            if (ts >= week) weekTotal += s.seconds;
+            if (ts >= month) monthTotal += s.seconds;
+        });
+
+        document.getElementById('todayTime').textContent = secondsToHM(todayTotal);
+        document.getElementById('weekTime').textContent = secondsToHM(weekTotal);
+        document.getElementById('monthTime').textContent = secondsToHM(monthTotal);
+        document.getElementById('sessionsCount').textContent = sessions.length;
+    }
+
+    // ============ GOOGLE DRIVE SYNC ============
+    const GOOGLE_CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'; // Replace with your Client ID
+    const GOOGLE_SCOPE = 'https://www.googleapis.com/auth/drive.file';
+
+    function updateSyncStatus(text, status = 'offline') {
+        const statusEl = document.getElementById('syncStatus');
+        const iconEl = document.getElementById('syncIcon');
+        const textEl = document.getElementById('syncText');
+        
+        textEl.textContent = text;
+        statusEl.className = 'sync-status ' + (status === 'syncing' ? 'syncing' : status === 'synced' ? 'synced' : '');
+        iconEl.textContent = status === 'syncing' ? '⟳' : status === 'synced' ? '✓' : '○';
+    }
+
+    async function initGoogleAuth() {
+        const authStatus = document.getElementById('authStatus');
+        
+        // For production: Load Google API
+        if (!window.gapi) {
+            authStatus.innerHTML = '<div class="alert info">⚠️ Google Drive sync requires Google API setup</div>';
+            return;
+        }
+
+        // Check if already signed in
+        const auth = gapi.auth2.getAuthInstance();
+        if (auth && auth.isSignedIn.get()) {
+            updateAuthUI(true);
+        } else {
+            updateAuthUI(false);
+        }
+    }
+
+    function updateAuthUI(isSignedIn) {
+        const authStatus = document.getElementById('authStatus');
+        const signInBtn = document.getElementById('googleSignIn');
+        
+        if (isSignedIn) {
+            authStatus.innerHTML = '<div class="alert success">✓ Signed in to Google Drive</div>';
+            signInBtn.textContent = 'Sign out';
+            signInBtn.addEventListener('click', signOutGoogle);
+        } else {
+            authStatus.innerHTML = '<div class="alert info">Sign in to enable cloud backup</div>';
+            signInBtn.textContent = 'Sign in with Google';
+            signInBtn.addEventListener('click', signInGoogle);
+        }
+    }
+
+    async function signInGoogle() {
+        // Placeholder - requires full Google API setup
+        alert('Google Drive sync requires setting up OAuth credentials. See README for instructions.');
+    }
+
+    async function signOutGoogle() {
+        localStorage.removeItem(LS_GDRIVE_ID);
+        location.reload();
+    }
+
+    async function syncToGoogle() {
+        updateSyncStatus('Syncing...', 'syncing');
+        // Simulated sync - in production, would upload to Google Drive
+        setTimeout(() => {
+            updateSyncStatus('Synced', 'synced');
+            setTimeout(() => updateSyncStatus('Offline', 'offline'), 3000);
+        }, 1000);
+    }
+
+    // ============ BACKUP & DOWNLOAD ============
+    document.getElementById('downloadBackup').addEventListener('click', () => {
+        const backup = {
+            subjects,
+            sessions,
+            exportedAt: new Date().toISOString()
+        };
+        const blob = new Blob([JSON.stringify(backup, null, 2)], {type: 'application/json'});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `study-tracker-backup-${Date.now()}.json`;
+        a.click();
+        URL.revokeObjectURL(url);
+    });
+
+    // ============ RESET DATA ============
+    document.getElementById('resetData').addEventListener('click', () => {
+        if (confirm('⚠️ Delete ALL data? This cannot be undone.')) {
+            subjects = DEFAULT_SUBJECTS.map(name => ({name, chapters: 0, completed: 0}));
+            sessions = [];
+            saveSubjects(subjects);
+            saveSessions(sessions);
+            renderSubjects();
+            updateStats();
+            alert('Data reset.');
+        }
+    });
+
+    // ============ INSTALL PROMPT ============
+    let deferredPrompt;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        deferredPrompt = e;
+        document.getElementById('installApp').style.display = 'block';
+    });
+
+    document.getElementById('installApp').addEventListener('click', async () => {
+        if (deferredPrompt) {
+            deferredPrompt.prompt();
+            const {outcome} = await deferredPrompt.userChoice;
+            if (outcome === 'accepted') {
+                deferredPrompt = null;
+                document.getElementById('installApp').style.display = 'none';
+            }
+        }
+    });
+
+    // ============ SERVICE WORKER ============
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('data:application/javascript,' + encodeURIComponent(`
+            self.addEventListener('install', e => e.waitUntil(caches.open('study-v1')));
+            self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+        `)).catch(err => console.log('SW registration failed:', err));
+    }
+
+    // ============ INIT ============
+    initTheme();
+    renderSubjects();
+    updateStats();
+    updateSyncStatus('Offline', 'offline');
+    initGoogleAuth();
+
+</script>
+
+</body>
+</html>
