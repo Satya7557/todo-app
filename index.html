@@ -390,6 +390,7 @@
     const LS_SUBJECTS = 'study_subjects_v1';
     const LS_SESSIONS = 'study_sessions_v1';
     const LS_POMODORO = 'study_pomodoro_v1';
+    const API_URL = 'https://script.google.com/macros/s/AKfycbwdFlqz48KvvCRRl4mUmGwU8NSL5j1ixnMOtHJHk6VqVjhF5YUUBPmkTnMYatVpENOipw/exec';
 
     // Theme management
     const themeToggle = document.getElementById('themeToggle');
@@ -421,14 +422,42 @@
     });
 
     // load or init
-    function loadSubjects(){
-        const raw = localStorage.getItem(LS_SUBJECTS);
-        if(raw) return JSON.parse(raw);
-        const init = DEFAULT_SUBJECTS.map(name=>({name, chapters:0, completed:0}));
-        localStorage.setItem(LS_SUBJECTS, JSON.stringify(init));
-        return init;
-    }
-    function saveSubjects(arr){ localStorage.setItem(LS_SUBJECTS, JSON.stringify(arr)); }
+    async function loadSubjects() {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+
+    return data.subjects || [];
+}
+
+async function saveSubjects(arr) {
+    await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+            type: 'subjects',
+            subjects: arr.map((s, i) => ({
+                id: i,
+                ...s
+            }))
+        })
+    });
+}
+
+async function loadSessions() {
+    const res = await fetch(API_URL);
+    const data = await res.json();
+
+    return data.sessions || [];
+}
+
+async function saveSession(session) {
+    await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+            type: 'session',
+            session
+        })
+    });
+}
 
     function loadSessions(){
         const raw = localStorage.getItem(LS_SESSIONS);
@@ -444,8 +473,8 @@
     }
     function savePomodoro(obj){ localStorage.setItem(LS_POMODORO, JSON.stringify(obj)); }
 
-    let subjects = loadSubjects();
-    let sessions = loadSessions();
+    let subjects = [];
+    let sessions = [];
     let pomodoro = loadPomodoro();
 
     // --- UI helpers ---
@@ -583,7 +612,8 @@
 
         const subjIdx = +subjectSelect.value;
         const session = {subject: subjIdx, seconds: totalElapsed, ts: new Date().toISOString()};
-        sessions.push(session); saveSessions(sessions);
+        sessions.push(session);
+saveSession(session);
 
         // reset timer
         running=false; clearInterval(timerInterval); elapsedBefore=0; startTime=null; timeDisplay.textContent='00:00:00';
@@ -751,16 +781,22 @@
     updatePomoDisplay();
 
     // --- Init ---
+async function initApp() {
     initTheme();
-    renderSubjects(); 
+
+    subjects = await loadSubjects();
+    sessions = await loadSessions();
+
+    renderSubjects();
     updateStatsAndChart();
+
     document.getElementById('sessionsCount').textContent = sessions.length;
 
-    // initial button states
-    pauseBtn.disabled=true; saveBtn.disabled=true;
+    pauseBtn.disabled = true;
+    saveBtn.disabled = true;
+}
 
-    // data migration guard (if old invalid saved state)
-    if(!Array.isArray(subjects) || subjects.length!==DEFAULT_SUBJECTS.length){ subjects = DEFAULT_SUBJECTS.map(name=>({name,chapters:0,completed:0})); saveSubjects(subjects); }
+initApp();
 </script>
 </body>
 </html>
