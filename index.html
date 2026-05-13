@@ -3,6 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#60a5fa">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Study Tracker">
     <title>Study Tracker</title>
     <!-- Favicon -->
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📚</text></svg>">
@@ -287,6 +292,102 @@
             color: var(--muted);
             margin-top: 8px;
         }
+    html {
+    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
+}
+
+body {
+    overscroll-behavior-y: contain;
+}
+
+button {
+    touch-action: manipulation;
+}
+
+@media (max-width: 768px) {
+
+    body {
+        padding-bottom: 80px;
+    }
+
+    .container {
+        margin: 0;
+        padding: 12px;
+    }
+
+    header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .theme-toggle {
+        margin-left: 0;
+        width: 100%;
+        justify-content: center;
+    }
+
+    .content {
+        grid-template-columns: 1fr;
+        gap: 14px;
+    }
+
+    .card {
+        padding: 14px;
+        border-radius: 16px;
+    }
+
+    .subject {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+
+    .subject .meta {
+        width: 100%;
+    }
+
+    .progress-wrap {
+        width: 100%;
+    }
+
+    input[type=number] {
+        width: 72px;
+        font-size: 16px;
+    }
+
+    button,
+    select {
+        min-height: 44px;
+        font-size: 15px;
+    }
+
+    .controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .stats {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .time-display {
+        font-size: 34px;
+        text-align: center;
+        width: 100%;
+    }
+
+    .pomodoro-controls,
+    .pomodoro-mode {
+        flex-wrap: wrap;
+    }
+
+    table {
+        font-size: 14px;
+    }
+}
     </style>
 </head>
 <body>
@@ -791,6 +892,14 @@ async function initApp() {
 }
 
 initApp();
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+
+    console.log('PWA install available');
+});
 </script>
 </body>
 </html>
