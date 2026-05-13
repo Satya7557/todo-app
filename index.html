@@ -459,12 +459,6 @@ async function saveSession(session) {
     });
 }
 
-    function loadSessions(){
-        const raw = localStorage.getItem(LS_SESSIONS);
-        if(raw) return JSON.parse(raw);
-        return [];
-    }
-    function saveSessions(arr){ localStorage.setItem(LS_SESSIONS, JSON.stringify(arr)); }
 
     function loadPomodoro(){
         const raw = localStorage.getItem(LS_POMODORO);
